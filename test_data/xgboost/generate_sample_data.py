@@ -1,6 +1,6 @@
 # /// script
 # dependencies = [
-#   "xgboost-cpu",
+#   "xgboost-cpu<=3.0.2",
 #   "scikit-learn",
 # ]
 # ///
@@ -12,75 +12,53 @@ import xgboost as xgb
 from sklearn.datasets import make_classification, make_regression
 
 
-def train_regression_model():
-    # Load the diabetes dataset
-    X, y = make_regression(n_samples=100, n_features=10, noise=0.1)
-    print(f"Dataset shape: X={X.shape}, y={y.shape}")
-
-    dataset = xgb.DMatrix(X, label=y)
+def train_model(
+    X: np.ndarray,
+    y: np.ndarray,
+    objective: str,
+    num_class: int,
+    output_dir: Path,
+):
+    n = X.shape[0]
+    train_dataset = xgb.DMatrix(X[: n // 2], label=y[: n // 2])
+    test_dataset = xgb.DMatrix(X[n // 2 :], label=y[n // 2 :])
     params = {
-        "objective": "reg:squarederror",
-        "eval_metric": "rmse",
-        "tree_method": "hist",
+        "objective": objective,
+        "num_class": num_class,
+        "seed": 0,
     }
-    model = xgb.train(params, dataset, num_boost_round=50)
-    y_pred = model.predict(dataset, output_margin=True)
+    model = xgb.train(params, train_dataset)
+    y_pred = model.predict(test_dataset, output_margin=True)
 
-    output_dir = Path("regression")
     output_dir.mkdir(exist_ok=True)
-    model.save_model(output_dir / "xgb_model.json")
-    np.savetxt(output_dir / "X.csv", X, delimiter=",")
-    np.savetxt(output_dir / "y.csv", y_pred, delimiter=",")
-
-
-def train_binary_classification_model():
-    # Load the breast cancer dataset
-    X, y = make_classification(
-        n_samples=100, n_features=10, n_classes=2, n_informative=5
-    )
-    print(f"Dataset shape: X={X.shape}, y={y.shape}")
-
-    dataset = xgb.DMatrix(X, label=y)
-    params = {
-        "objective": "binary:logistic",
-        "eval_metric": "logloss",
-        "tree_method": "hist",
-    }
-    model = xgb.train(params, dataset, num_boost_round=50)
-    y_pred = model.predict(dataset, output_margin=True)
-
-    output_dir = Path("binary_classification")
-    output_dir.mkdir(exist_ok=True)
-    model.save_model(output_dir / "xgb_model.json")
-    np.savetxt(output_dir / "X.csv", X, delimiter=",")
-    np.savetxt(output_dir / "y.csv", y_pred, delimiter=",")
-
-
-def train_multiclass_classification_model():
-    # Load a synthetic multiclass classification dataset
-    X, y = make_classification(
-        n_samples=100, n_features=10, n_classes=3, n_informative=7
-    )
-    print(f"Dataset shape: X={X.shape}, y={y.shape}")
-
-    dataset = xgb.DMatrix(X, label=y)
-    params = {
-        "objective": "multi:softprob",
-        "num_class": 3,
-        "eval_metric": "mlogloss",
-        "tree_method": "hist",
-    }
-    model = xgb.train(params, dataset, num_boost_round=50)
-    y_pred = model.predict(dataset, output_margin=True)
-
-    output_dir = Path("multiclass_classification")
-    output_dir.mkdir(exist_ok=True)
-    model.save_model(output_dir / "xgb_model.json")
-    np.savetxt(output_dir / "X.csv", X, delimiter=",")
+    model.save_model(output_dir / "model.json")
+    np.savetxt(output_dir / "X.csv", X[n // 2 :], delimiter=",")
     np.savetxt(output_dir / "y.csv", y_pred, delimiter=",")
 
 
 if __name__ == "__main__":
-    train_regression_model()
-    train_binary_classification_model()
-    train_multiclass_classification_model()
+    output_dir = Path("test_data/xgboost")
+    n_samples = 100
+    n_features = 5
+    for target in ["regression", "binary_classification", "multiclass_classification"]:
+        match target:
+            case "regression":
+                X, y = make_regression(n_samples=n_samples, n_features=n_features)
+                objective = "reg:squarederror"
+                num_class = 0
+            case "binary_classification":
+                X, y = make_classification(
+                    n_samples=n_samples, n_features=n_features, n_classes=2
+                )
+                objective = "binary:logistic"
+                num_class = 0
+            case "multiclass_classification":
+                X, y = make_classification(
+                    n_samples=n_samples,
+                    n_features=n_features,
+                    n_classes=3,
+                    n_informative=3,
+                )
+                objective = "multi:softprob"
+                num_class = 3
+        train_model(X, y, objective, num_class, output_dir / target)
