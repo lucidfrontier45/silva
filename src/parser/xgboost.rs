@@ -93,8 +93,8 @@ impl TreeRecord {
                 id: i,
                 split_index: split_index as usize,
                 split_condition: ordered_float::NotNan::new(split_condition).unwrap(),
-                left: if left >= 0 { Some(left as usize) } else { None },
-                right: if right >= 0 {
+                left: if left > 0 { Some(left as usize) } else { None },
+                right: if right > 0 {
                     Some(right as usize)
                 } else {
                     None
@@ -159,12 +159,8 @@ pub fn parse_xgboost_model(record: XGBoostModelRecord) -> Forest {
             panic!("Only gbtree models are supported");
         };
 
-    let base_score: f64 = record
-        .learner
-        .learner_model_param
-        .base_score
-        .parse()
-        .unwrap();
+    let base_scores: Vec<f64> = parse_base_score(&record.learner.learner_model_param.base_score);
+    let base_score = base_scores[0];
 
     let base_score = match record.learner.objective {
         Objective::RegSquaredError { .. } => base_score,
@@ -179,4 +175,73 @@ pub fn read_xgboost_model(path: impl AsRef<Path>) -> AnyResult<Forest> {
     read_record_from_file(path)
         .context("Failed to read XGBoost model file")
         .map(parse_xgboost_model)
+}
+
+fn parse_base_score(s: &str) -> Vec<f64> {
+    // [0.1,0.2,.03] -> Vec<f64>
+    s.trim_matches(&['[', ']'][..])
+        .split(',')
+        .map(|x| x.parse::<f64>().unwrap())
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path::PathBuf};
+
+    use crate::parser::read_xgboost_model;
+
+    #[test]
+    fn test_xgboost_regression() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let root = PathBuf::from(manifest_dir);
+        let data_dir = root.join("test_data/xgboost/regression");
+        // let data_dir = root.join("regression");
+
+        // 1. read @test_data/xgboost/regression/xgb_model.json by using read_xgboost_model
+        let model_path = data_dir.join("model.json");
+        let forest = read_xgboost_model(&model_path).expect("Failed to load model");
+
+        // 2. read @test_data/xgboost/regression/X.csv
+        let x_path = data_dir.join("X.csv");
+        let x_content = fs::read_to_string(x_path).expect("Failed to read X.csv");
+        let x_data: Vec<Vec<f64>> = x_content
+            .lines()
+            .map(|line| {
+                line.split(',')
+                    .map(|s| s.parse::<f64>().expect("Failed to parse X value"))
+                    .collect()
+            })
+            .collect();
+
+        // 4. read @test_data/xgboost/regression/y.csv
+        let y_path = data_dir.join("y.csv");
+        let y_content = fs::read_to_string(y_path).expect("Failed to read y.csv");
+        let y_data: Vec<f64> = y_content
+            .lines()
+            .map(|line| line.parse::<f64>().expect("Failed to parse y value"))
+            .collect();
+
+        assert_eq!(x_data.len(), y_data.len(), "X and y size mismatch");
+
+        // 3. predict value & 5. check if predicted values and y are all close
+        let mut max_diff = 0.0;
+        for (x, y) in x_data.iter().zip(y_data.iter()) {
+            let prediction = forest.predict(x).into_inner();
+            let diff = (prediction - y).abs();
+            if diff > max_diff {
+                max_diff = diff;
+            }
+        }
+
+        println!("Max difference: {}", max_diff);
+
+        // Using a tolerance of 0.05 to account for f64 vs f64 precision differences
+        // and accumulation across trees.
+        assert!(
+            max_diff < 0.05,
+            "Max difference {} exceeds tolerance",
+            max_diff
+        );
+    }
 }
