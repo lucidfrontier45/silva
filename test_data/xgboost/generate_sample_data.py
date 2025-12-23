@@ -1,6 +1,6 @@
 # /// script
 # dependencies = [
-#   "xgboost-cpu<=3.0.2",
+#   "xgboost-cpu",
 #   "scikit-learn",
 # ]
 # ///

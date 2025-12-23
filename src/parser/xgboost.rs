@@ -1,11 +1,11 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path, vec};
 
 use anyhow::{Context, Result as AnyResult};
-use itertools::izip;
+use itertools::{Itertools, izip};
 use serde::{Deserialize, Serialize};
 use serdeio::read_record_from_file;
 
-use crate::{Forest, Tree, TreeNode};
+use crate::{Forest, MultiOutputForest, Tree, TreeNode};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct XGBoostModelRecord {
@@ -18,7 +18,7 @@ pub struct LearnerRecord {
     pub feature_names: Option<Vec<String>>,
     pub feature_types: Option<Vec<String>>,
     pub gradient_booster: GradientBooster,
-    pub objective: Objective,
+    pub objective: ObjectiveRecord,
     pub learner_model_param: LearnerModelParamRecord,
 }
 
@@ -132,18 +132,31 @@ pub struct LearnerModelParamRecord {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "name")]
-pub enum Objective {
-    #[serde(rename = "reg:squarederror")]
-    RegSquaredError {
-        reg_loss_param: Option<RegLossParamRecord>,
-    },
-    #[serde(rename = "binary:logistic")]
-    BinaryLogistic {
-        reg_loss_param: Option<RegLossParamRecord>,
-    },
-    #[serde(other)]
-    Other,
+pub struct ObjectiveRecord {
+    name: String,
+    #[serde(flatten)]
+    extra_fields: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum Objective {
+    RegSquaredError,
+    BinaryLogistic,
+    MultiSoftmax,
+    MultiSoftprob,
+    Unknown,
+}
+
+impl From<ObjectiveRecord> for Objective {
+    fn from(record: ObjectiveRecord) -> Self {
+        match record.name.as_str() {
+            "reg:squarederror" => Objective::RegSquaredError,
+            "binary:logistic" => Objective::BinaryLogistic,
+            "multi:softmax" => Objective::MultiSoftmax,
+            "multi:softprob" => Objective::MultiSoftprob,
+            _ => Objective::Unknown,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -155,27 +168,47 @@ fn logit(p: f64) -> f64 {
     (p / (1.0 - p)).ln()
 }
 
-pub fn parse_xgboost_model(record: XGBoostModelRecord) -> Forest {
-    let (trees, _tree_info) =
+pub fn parse_xgboost_model(record: XGBoostModelRecord) -> MultiOutputForest {
+    let (trees, tree_info) =
         if let GradientBooster::Gbtree { model } = record.learner.gradient_booster {
             model.parse()
         } else {
             panic!("Only gbtree models are supported");
         };
 
+    // group trees into forests based on tree_info values
+    let n_classes = tree_info.iter().max().unwrap() + 1;
+    let mut tree_groups = vec![Vec::new(); n_classes];
+    for (tree, &class_idx) in trees.into_iter().zip(tree_info.iter()) {
+        tree_groups[class_idx].push(tree);
+    }
+
+    let objective = Objective::from(record.learner.objective);
+
     let base_scores: Vec<f64> = parse_base_score(&record.learner.learner_model_param.base_score);
-    let base_score = base_scores[0];
+    let mut base_values = base_scores
+        .into_iter()
+        .map(|s| match objective {
+            Objective::RegSquaredError => s,
+            Objective::BinaryLogistic => logit(s),
+            Objective::MultiSoftmax | Objective::MultiSoftprob => s,
+            _ => panic!("Unsupported objective function"),
+        })
+        .collect_vec();
+    if base_values.len() == 1 && n_classes > 1 {
+        base_values = vec![base_values[0]; n_classes];
+    }
 
-    let base_score = match record.learner.objective {
-        Objective::RegSquaredError { .. } => base_score,
-        Objective::BinaryLogistic { .. } => logit(base_score),
-        _ => panic!("Unsupported objective function"),
-    };
+    let forests: Vec<Forest> = tree_groups
+        .into_iter()
+        .zip(base_values)
+        .map(|(trees, base_value)| Forest::new(base_value, trees))
+        .collect();
 
-    Forest::new(base_score, trees)
+    MultiOutputForest::new(forests)
 }
 
-pub fn read_xgboost_model(path: impl AsRef<Path>) -> AnyResult<Forest> {
+pub fn read_xgboost_model(path: impl AsRef<Path>) -> AnyResult<MultiOutputForest> {
     read_record_from_file(path)
         .context("Failed to read XGBoost model file")
         .map(parse_xgboost_model)
@@ -234,15 +267,18 @@ mod tests {
         let y_content = fs::read_to_string(y_path).expect("Failed to read y.csv");
         let y_data: Vec<f64> = y_content
             .lines()
-            .map(|line| line.parse::<f64>().expect("Failed to parse y value"))
+            .flat_map(|line| {
+                line.split(',')
+                    .map(|s| s.parse::<f64>().expect("Failed to parse y value"))
+                    .collect::<Vec<f64>>()
+            })
             .collect();
-
-        assert_eq!(x_data.len(), y_data.len(), "X and y size mismatch");
 
         // 3. predict value & 5. check if predicted values and y are all close
         let preds = x_data
             .iter()
-            .map(|x| forest.predict(x).into_inner())
+            .flat_map(|x| forest.predict(x))
+            .map(|v| v.into_inner())
             .collect::<Vec<f64>>();
         assert!(
             all_close(&preds, &y_data, 0.05),
@@ -258,5 +294,10 @@ mod tests {
     #[test]
     fn test_binary_classification() {
         test_xgboost("binary_classification");
+    }
+
+    #[test]
+    fn test_multiclass_classification() {
+        test_xgboost("multiclass_classification");
     }
 }
