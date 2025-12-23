@@ -151,6 +151,10 @@ pub struct RegLossParamRecord {
     pub scale_pos_weight: Option<String>,
 }
 
+fn logit(p: f64) -> f64 {
+    (p / (1.0 - p)).ln()
+}
+
 pub fn parse_xgboost_model(record: XGBoostModelRecord) -> Forest {
     let (trees, _tree_info) =
         if let GradientBooster::Gbtree { model } = record.learner.gradient_booster {
@@ -164,7 +168,7 @@ pub fn parse_xgboost_model(record: XGBoostModelRecord) -> Forest {
 
     let base_score = match record.learner.objective {
         Objective::RegSquaredError { .. } => base_score,
-        Objective::BinaryLogistic { .. } => base_score / (1.0 - base_score),
+        Objective::BinaryLogistic { .. } => logit(base_score),
         _ => panic!("Unsupported objective function"),
     };
 
@@ -191,11 +195,22 @@ mod tests {
 
     use crate::parser::read_xgboost_model;
 
-    #[test]
-    fn test_xgboost_regression() {
+    fn all_close(a: &[f64], b: &[f64], tol: f64) -> bool {
+        if a.len() != b.len() {
+            return false;
+        }
+        for (x, y) in a.iter().zip(b.iter()) {
+            if (x - y).abs() > tol {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn test_xgboost(model_type: &str) {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let root = PathBuf::from(manifest_dir);
-        let data_dir = root.join("test_data/xgboost/regression");
+        let data_dir = root.join(format!("test_data/xgboost/{}", model_type));
         // let data_dir = root.join("regression");
 
         // 1. read @test_data/xgboost/regression/xgb_model.json by using read_xgboost_model
@@ -225,23 +240,23 @@ mod tests {
         assert_eq!(x_data.len(), y_data.len(), "X and y size mismatch");
 
         // 3. predict value & 5. check if predicted values and y are all close
-        let mut max_diff = 0.0;
-        for (x, y) in x_data.iter().zip(y_data.iter()) {
-            let prediction = forest.predict(x).into_inner();
-            let diff = (prediction - y).abs();
-            if diff > max_diff {
-                max_diff = diff;
-            }
-        }
-
-        println!("Max difference: {}", max_diff);
-
-        // Using a tolerance of 0.05 to account for f64 vs f64 precision differences
-        // and accumulation across trees.
+        let preds = x_data
+            .iter()
+            .map(|x| forest.predict(x).into_inner())
+            .collect::<Vec<f64>>();
         assert!(
-            max_diff < 0.05,
-            "Max difference {} exceeds tolerance",
-            max_diff
+            all_close(&preds, &y_data, 0.05),
+            "Predictions and y values differ more than tolerance"
         );
+    }
+
+    #[test]
+    fn test_regression() {
+        test_xgboost("regression");
+    }
+
+    #[test]
+    fn test_binary_classification() {
+        test_xgboost("binary_classification");
     }
 }
