@@ -4,5 +4,5 @@ mod tree;
 
 pub mod parser;
 
-pub use forest::Forest;
+pub use forest::{Forest, MultiOutputForest};
 pub use tree::{Tree, TreeNode};

@@ -27,6 +27,24 @@ impl Forest {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultiOutputForest {
+    forests: Vec<Forest>,
+}
+
+impl MultiOutputForest {
+    pub fn new(forests: Vec<Forest>) -> Self {
+        Self { forests }
+    }
+
+    pub fn predict(&self, x: &[f64]) -> Vec<NotNan<f64>> {
+        self.forests
+            .iter()
+            .map(|forest| forest.predict(x))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ordered_float::NotNan;
