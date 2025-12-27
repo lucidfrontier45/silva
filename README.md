@@ -6,7 +6,7 @@ Silba is a tiny inference engine for tree ensemble models (a.k.a forest models) 
 
 - Silva format
 - XGBoost (regression and classification only)
-- LightGBM (todo)
+- LightGBM
 
 # Use this library
 
