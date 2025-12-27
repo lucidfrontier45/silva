@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::Result as AnyResult;
+use itertools::izip;
 
 use crate::{
     Forest, MultiOutputForest,
@@ -37,14 +38,18 @@ impl From<LGBMTreeRecord> for Tree {
 
         let num_internal = record.split_features.len();
 
-        for i in 0..record.split_features.len() {
-            let left_child = record.left_children[i];
-            let right_child = record.right_children[i];
-
+        for (i, (&split_feature, &threshold, &left_child, &right_child)) in izip!(
+            &record.split_features,
+            &record.thresholds,
+            &record.left_children,
+            &record.right_children
+        )
+        .enumerate()
+        {
             let node = TreeNode {
                 id: i,
-                split_index: record.split_features[i],
-                split_condition: NotNan::new(record.thresholds[i]).unwrap(),
+                split_index: split_feature,
+                split_condition: NotNan::new(threshold).unwrap(),
                 left: if left_child >= 0 {
                     Some(left_child as usize)
                 } else {
