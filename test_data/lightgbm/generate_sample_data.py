@@ -1,0 +1,65 @@
+# /// script
+# dependencies = [
+#   "lightgbm",
+#   "scikit-learn",
+# ]
+# ///
+
+from pathlib import Path
+
+import lightgbm as lgb
+import numpy as np
+from sklearn.datasets import make_classification, make_regression
+
+
+def train_model(
+    X: np.ndarray,
+    y: np.ndarray,
+    objective: str,
+    num_class: int,
+    output_dir: Path,
+):
+    n = X.shape[0]
+    train_dataset = lgb.Dataset(X[: n // 2], label=y[: n // 2])
+    test_x = X[n // 2 :]
+    params = {
+        "objective": objective,
+        "num_class": num_class,
+        "min_data_in_leaf": 5,
+        "seed": 0,
+    }
+    model = lgb.train(params, train_dataset)
+    y_pred = model.predict(test_x, raw_score=True)
+
+    output_dir.mkdir(exist_ok=True)
+    model.save_model(output_dir / "model.txt")
+    np.savetxt(output_dir / "X.csv", test_x, delimiter=",")
+    np.savetxt(output_dir / "y.csv", y_pred, delimiter=",")
+
+
+if __name__ == "__main__":
+    output_dir = Path("test_data/lightgbm")
+    n_samples = 100
+    n_features = 5
+    for target in ["regression", "binary_classification", "multiclass_classification"]:
+        match target:
+            case "regression":
+                X, y = make_regression(n_samples=n_samples, n_features=n_features)
+                objective = "regression"
+                num_class = 1
+            case "binary_classification":
+                X, y = make_classification(
+                    n_samples=n_samples, n_features=n_features, n_classes=2
+                )
+                objective = "binary"
+                num_class = 1
+            case "multiclass_classification":
+                X, y = make_classification(
+                    n_samples=n_samples,
+                    n_features=n_features,
+                    n_classes=3,
+                    n_informative=3,
+                )
+                objective = "multiclass"
+                num_class = 3
+        train_model(X, y, objective, num_class, output_dir / target)
