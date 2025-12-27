@@ -195,65 +195,18 @@ fn parse_tree_section(lines: &[&str], start_idx: usize) -> Option<LGBMTreeRecord
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::PathBuf};
+    use std::path::PathBuf;
 
-    use crate::parser::read_lightgbm_model;
-
-    fn all_close(a: &[f64], b: &[f64], tol: f64) -> bool {
-        if a.len() != b.len() {
-            return false;
-        }
-        for (x, y) in a.iter().zip(b.iter()) {
-            if (x - y).abs() > tol {
-                return false;
-            }
-        }
-        true
-    }
+    use crate::parser::{read_lightgbm_model, test_utils::test_model_prediction};
 
     fn test_lightgbm(model_type: &str) {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let root = PathBuf::from(manifest_dir);
         let data_dir = root.join(format!("test_data/lightgbm/{}", model_type));
-
-        // 1. read @test_data/lightgbm/regression/model.txt by using read_lightgbm_model
         let model_path = data_dir.join("model.txt");
         let forest = read_lightgbm_model(&model_path).expect("Failed to load model");
 
-        // 2. read @test_data/lightgbm/regression/X.csv
-        let x_path = data_dir.join("X.csv");
-        let x_content = fs::read_to_string(x_path).expect("Failed to read X.csv");
-        let x_data: Vec<Vec<f64>> = x_content
-            .lines()
-            .map(|line| {
-                line.split(',')
-                    .map(|s| s.parse::<f64>().expect("Failed to parse X value"))
-                    .collect()
-            })
-            .collect();
-
-        // 4. read @test_data/lightgbm/regression/y.csv
-        let y_path = data_dir.join("y.csv");
-        let y_content = fs::read_to_string(y_path).expect("Failed to read y.csv");
-        let y_data: Vec<f64> = y_content
-            .lines()
-            .flat_map(|line| {
-                line.split(',')
-                    .map(|s| s.parse::<f64>().expect("Failed to parse y value"))
-                    .collect::<Vec<f64>>()
-            })
-            .collect();
-
-        // 3. predict value & 5. check if predicted values and y are all close
-        let preds = x_data
-            .iter()
-            .flat_map(|x| forest.predict(x))
-            .map(|v| v.into_inner())
-            .collect::<Vec<f64>>();
-        assert!(
-            all_close(&preds, &y_data, 0.05),
-            "Predictions and y values differ more than tolerance"
-        );
+        test_model_prediction(&data_dir, &forest, 0.05).expect("Test failed");
     }
 
     #[test]
