@@ -35,38 +35,44 @@ impl From<LGBMTreeRecord> for Tree {
 
         let mut nodes = Vec::new();
 
+        let num_internal = record.split_features.len();
+
         for i in 0..record.split_features.len() {
             let left_child = record.left_children[i];
             let right_child = record.right_children[i];
 
-            if left_child >= 0 || right_child >= 0 {
-                nodes.push(TreeNode {
-                    id: i,
-                    split_index: record.split_features[i],
-                    split_condition: NotNan::new(record.thresholds[i]).unwrap(),
-                    left: if left_child >= 0 {
-                        Some(left_child as usize)
-                    } else {
-                        None
-                    },
-                    right: if right_child >= 0 {
-                        Some(right_child as usize)
-                    } else {
-                        None
-                    },
-                    value: NotNan::new(0.0).unwrap(),
-                });
-            } else {
-                let leaf_index = (-left_child) as usize - 1;
-                nodes.push(TreeNode {
-                    id: i,
-                    split_index: 0,
-                    split_condition: NotNan::new(0.0).unwrap(),
-                    left: None,
-                    right: None,
-                    value: NotNan::new(record.left_values[leaf_index]).unwrap(),
-                });
-            }
+            let node = TreeNode {
+                id: i,
+                split_index: record.split_features[i],
+                split_condition: NotNan::new(record.thresholds[i]).unwrap(),
+                left: if left_child >= 0 {
+                    Some(left_child as usize)
+                } else {
+                    let leaf_id = num_internal + ((-left_child) as usize - 1);
+                    Some(leaf_id)
+                },
+                right: if right_child >= 0 {
+                    Some(right_child as usize)
+                } else {
+                    let leaf_id = num_internal + ((-right_child) as usize - 1);
+                    Some(leaf_id)
+                },
+                value: NotNan::new(0.0).unwrap(),
+            };
+            nodes.push(node);
+        }
+
+        for (i, &leaf_value) in record.left_values.iter().enumerate() {
+            let leaf_id = num_internal + i;
+            let leaf_node = TreeNode {
+                id: leaf_id,
+                split_index: 0,
+                split_condition: NotNan::new(0.0).unwrap(),
+                left: None,
+                right: None,
+                value: NotNan::new(leaf_value).unwrap(),
+            };
+            nodes.push(leaf_node);
         }
 
         Tree::from_nodes(nodes)
@@ -185,4 +191,83 @@ fn parse_tree_section(lines: &[&str], start_idx: usize) -> Option<LGBMTreeRecord
         right_children: right_children?,
         left_values: leaf_values?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path::PathBuf};
+
+    use crate::parser::read_lightgbm_model;
+
+    fn all_close(a: &[f64], b: &[f64], tol: f64) -> bool {
+        if a.len() != b.len() {
+            return false;
+        }
+        for (x, y) in a.iter().zip(b.iter()) {
+            if (x - y).abs() > tol {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn test_lightgbm(model_type: &str) {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let root = PathBuf::from(manifest_dir);
+        let data_dir = root.join(format!("test_data/lightgbm/{}", model_type));
+
+        // 1. read @test_data/lightgbm/regression/model.txt by using read_lightgbm_model
+        let model_path = data_dir.join("model.txt");
+        let forest = read_lightgbm_model(&model_path).expect("Failed to load model");
+
+        // 2. read @test_data/lightgbm/regression/X.csv
+        let x_path = data_dir.join("X.csv");
+        let x_content = fs::read_to_string(x_path).expect("Failed to read X.csv");
+        let x_data: Vec<Vec<f64>> = x_content
+            .lines()
+            .map(|line| {
+                line.split(',')
+                    .map(|s| s.parse::<f64>().expect("Failed to parse X value"))
+                    .collect()
+            })
+            .collect();
+
+        // 4. read @test_data/lightgbm/regression/y.csv
+        let y_path = data_dir.join("y.csv");
+        let y_content = fs::read_to_string(y_path).expect("Failed to read y.csv");
+        let y_data: Vec<f64> = y_content
+            .lines()
+            .flat_map(|line| {
+                line.split(',')
+                    .map(|s| s.parse::<f64>().expect("Failed to parse y value"))
+                    .collect::<Vec<f64>>()
+            })
+            .collect();
+
+        // 3. predict value & 5. check if predicted values and y are all close
+        let preds = x_data
+            .iter()
+            .flat_map(|x| forest.predict(x))
+            .map(|v| v.into_inner())
+            .collect::<Vec<f64>>();
+        assert!(
+            all_close(&preds, &y_data, 0.05),
+            "Predictions and y values differ more than tolerance"
+        );
+    }
+
+    #[test]
+    fn test_regression() {
+        test_lightgbm("regression");
+    }
+
+    #[test]
+    fn test_binary_classification() {
+        test_lightgbm("binary_classification");
+    }
+
+    #[test]
+    fn test_multiclass_classification() {
+        test_lightgbm("multiclass_classification");
+    }
 }
