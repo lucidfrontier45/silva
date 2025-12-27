@@ -1,7 +1,8 @@
 use std::{fs::read_to_string, path::Path};
 
-use crate::MultiOutputForest;
 use anyhow::Result as AnyResult;
+
+use crate::MultiOutputForest;
 
 pub fn all_close(a: &[f64], b: &[f64], tol: f64) -> bool {
     if a.len() != b.len() {
