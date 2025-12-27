@@ -26,7 +26,7 @@ struct LGBMTreeRecord {
     thresholds: Vec<f64>,
     left_children: Vec<i32>,
     right_children: Vec<i32>,
-    left_values: Vec<f64>,
+    leaf_values: Vec<f64>,
 }
 
 impl From<LGBMTreeRecord> for Tree {
@@ -62,7 +62,7 @@ impl From<LGBMTreeRecord> for Tree {
             nodes.push(node);
         }
 
-        for (i, &leaf_value) in record.left_values.iter().enumerate() {
+        for (i, &leaf_value) in record.leaf_values.iter().enumerate() {
             let leaf_id = num_internal + i;
             let leaf_node = TreeNode {
                 id: leaf_id,
@@ -189,7 +189,7 @@ fn parse_tree_section(lines: &[&str], start_idx: usize) -> Option<LGBMTreeRecord
         thresholds: thresholds?,
         left_children: left_children?,
         right_children: right_children?,
-        left_values: leaf_values?,
+        leaf_values: leaf_values?,
     })
 }
 
