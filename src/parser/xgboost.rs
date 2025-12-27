@@ -235,7 +235,12 @@ mod tests {
         let model_path = data_dir.join("model.json");
         let forest = read_xgboost_model(&model_path).expect("Failed to load model");
 
-        test_model_prediction(&data_dir, &forest, 0.05).expect("Test failed");
+        test_model_prediction(&data_dir, &forest, 0.05).unwrap_or_else(|e| {
+            panic!(
+                "XGBoost model prediction test failed for `{}` using data dir {:?}: {}",
+                model_type, data_dir, e
+            )
+        });
     }
 
     #[test]
