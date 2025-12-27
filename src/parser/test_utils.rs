@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{fs::read_to_string, path::Path};
 
 use crate::MultiOutputForest;
 use anyhow::Result as AnyResult;
@@ -16,7 +16,9 @@ pub fn all_close(a: &[f64], b: &[f64], tol: f64) -> bool {
 }
 
 pub fn read_features(path: &Path) -> Vec<Vec<f64>> {
-    let x_content = std::fs::read_to_string(path).expect("Failed to read X.csv");
+    let Ok(x_content) = read_to_string(path) else {
+        panic!("Failed to read X from{:?}", path);
+    };
     x_content
         .lines()
         .map(|line| {
@@ -28,7 +30,9 @@ pub fn read_features(path: &Path) -> Vec<Vec<f64>> {
 }
 
 pub fn read_labels_flattened(path: &Path) -> Vec<f64> {
-    let y_content = std::fs::read_to_string(path).expect("Failed to read y.csv");
+    let Ok(y_content) = read_to_string(path) else {
+        panic!("Failed to read y from {:?}", path);
+    };
     y_content
         .lines()
         .flat_map(|line| {
