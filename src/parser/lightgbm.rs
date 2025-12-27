@@ -206,7 +206,8 @@ mod tests {
         let model_path = data_dir.join("model.txt");
         let forest = read_lightgbm_model(&model_path).expect("Failed to load model");
 
-        test_model_prediction(&data_dir, &forest, 0.05).expect("Test failed");
+        test_model_prediction(&data_dir, &forest, 0.05)
+            .unwrap_or_else(|e| panic!("LightGBM {model_type} model prediction test failed: {e}"));
     }
 
     #[test]
