@@ -2,10 +2,22 @@ use std::path::Path;
 
 use anyhow::Result as AnyResult;
 
-use crate::{MultiOutputForest, tree::Tree};
+use crate::{
+    Forest, MultiOutputForest,
+    tree::{Tree, TreeNode},
+};
 
 pub fn read_lightgbm_model(path: impl AsRef<Path>) -> AnyResult<MultiOutputForest> {
-    todo!()
+    let tree_records = read_lightgbm_txt(path)?;
+    let trees = tree_records
+        .into_iter()
+        .map(|records| records.into_iter().map(Tree::from).collect::<Vec<Tree>>())
+        .collect::<Vec<Vec<Tree>>>();
+    let forests = trees
+        .into_iter()
+        .map(|tree_vec| Forest::new(0.0, tree_vec))
+        .collect::<Vec<Forest>>();
+    Ok(MultiOutputForest::new(forests))
 }
 
 #[derive(Clone)]
@@ -19,7 +31,45 @@ struct LGBMTreeRecord {
 
 impl From<LGBMTreeRecord> for Tree {
     fn from(record: LGBMTreeRecord) -> Self {
-        todo!()
+        use ordered_float::NotNan;
+
+        let mut nodes = Vec::new();
+
+        for i in 0..record.split_features.len() {
+            let left_child = record.left_children[i];
+            let right_child = record.right_children[i];
+
+            if left_child >= 0 || right_child >= 0 {
+                nodes.push(TreeNode {
+                    id: i,
+                    split_index: record.split_features[i],
+                    split_condition: NotNan::new(record.thresholds[i]).unwrap(),
+                    left: if left_child >= 0 {
+                        Some(left_child as usize)
+                    } else {
+                        None
+                    },
+                    right: if right_child >= 0 {
+                        Some(right_child as usize)
+                    } else {
+                        None
+                    },
+                    value: NotNan::new(0.0).unwrap(),
+                });
+            } else {
+                let leaf_index = (-left_child) as usize - 1;
+                nodes.push(TreeNode {
+                    id: i,
+                    split_index: 0,
+                    split_condition: NotNan::new(0.0).unwrap(),
+                    left: None,
+                    right: None,
+                    value: NotNan::new(record.left_values[leaf_index]).unwrap(),
+                });
+            }
+        }
+
+        Tree::from_nodes(nodes)
     }
 }
 
@@ -41,13 +91,10 @@ fn read_lightgbm_txt(path: impl AsRef<Path>) -> AnyResult<Vec<Vec<LGBMTreeRecord
             if let Some(record) = parse_tree_section(&lines, line_idx) {
                 tree_records.push(record);
             }
-        } else if let Some((key, value)) = line.split_once('=') {
-            match key {
-                "num_tree_per_iteration" => {
-                    num_tree_per_iteration = Some(value.parse()?);
-                }
-                _ => {}
-            }
+        } else if let Some((key, value)) = line.split_once('=')
+            && key == "num_tree_per_iteration"
+        {
+            num_tree_per_iteration = Some(value.parse()?);
         }
     }
 
