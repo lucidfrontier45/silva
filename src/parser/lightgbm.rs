@@ -14,6 +14,9 @@ pub fn read_lightgbm_model(path: impl AsRef<Path>) -> AnyResult<MultiOutputFores
         .into_iter()
         .map(|records| records.into_iter().map(Tree::from).collect::<Vec<Tree>>())
         .collect::<Vec<Vec<Tree>>>();
+    // LightGBM models don't use a separate base_value/margin concept like XGBoost.
+    // All bias terms are incorporated directly into leaf values during training,
+    // so we initialize with 0.0 as the neutral starting point.
     let forests = trees
         .into_iter()
         .map(|tree_vec| Forest::new(0.0, tree_vec))
