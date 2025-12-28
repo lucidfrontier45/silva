@@ -20,7 +20,7 @@
 ### Imports and Dependencies
 - Group imports in order: `std` -> external crates -> crate-local modules
 - Avoid glob imports (`use foo::*`) except for test modules when appropriate
-- External crates used: `anyhow`, `indexmap`, `itertools`, `ordered-float`, `rustc-hash`, `serde`, `serde_json`, `serdeio`, `thiserror`
+- External crates used: `indexmap`, `itertools`, `ordered-float`, `rustc-hash`, `serde`, `serde_json`, `serdeio`, `thiserror`
 - Custom type alias: `FxIndexMap<K, V>` for fast hash maps with deterministic iteration
 
 ### Naming Conventions
@@ -44,15 +44,15 @@
 - Internal implementation details should be `pub(crate)` at most
 
 ### Error Handling
-- Use `anyhow::Result<T>` for application boundaries (already in Cargo.toml)
+- Use custom error types (`XGBoostError`, `LightGBMError`) for parser-specific errors
 - Use `?` operator for error propagation throughout
 - Avoid `unwrap()` and `expect()` in library code
-- Use `Context` from anyhow for better error messages
 - Only panic on invariant violations that should never occur
-- Create custom error types for parser-specific errors (e.g., `XGBoostError`)
+- Create custom error types for parser-specific errors (e.g., `XGBoostError`, `LightGBMError`)
 - Use `thiserror` for custom error enum definitions with helpful error messages
 - Provide clear guidance on supported features/alternatives in error messages
 - Validate inputs early and return descriptive errors instead of panicking
+- Use `anyhow` only in test/example code (dev-dependencies)
 - Document all error scenarios in API documentation
 
 ### Data Structures

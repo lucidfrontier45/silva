@@ -10,7 +10,7 @@
 Order: `std` -> external crates -> crate-local modules
 ```rust
 use std::collections::HashMap;
-use anyhow::{Context, Result};
+use thiserror::Error;
 use crate::tree::Tree;
 ```
 
@@ -33,10 +33,10 @@ use crate::tree::Tree;
 - Internal implementation: `pub(crate)` at most
 
 ## Error Handling
-- Use `anyhow::Result<T>` for application boundaries
+- Use custom error types with `thiserror` for library code
 - Propagate errors with `?` operator
 - Avoid `unwrap()` and `expect()` in library code
-- Use `anyhow::Context` for better error messages
+- Use `anyhow` only in test/example code
 - Only panic on invariant violations
 
 ## Data Structures

@@ -44,7 +44,7 @@
 
 ## Safety Checks
 - [ ] All floating-point values use `NotNan<f64>`
-- [ ] Error handling uses `anyhow::Result<T>` properly
+- [ ] Error handling uses custom error types with `thiserror`
 - [ ] No `unwrap()` or `expect()` in library code
 - [ ] Proper bounds checking for array access
 

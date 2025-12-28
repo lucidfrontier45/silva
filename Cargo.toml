@@ -8,12 +8,14 @@ license = "MIT"
 categories = ["science"]
 
 [dependencies]
-anyhow = "1.0.100"
 indexmap = { version = "2.12.1", features = ["serde"] }
 itertools = "0.14.0"
 ordered-float = { version = "5.1.0", features = ["serde"] }
 rustc-hash = "2.1.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"
-serdeio = "0.4.1"
+serdeio = "0.5.0"
 thiserror = "2.0.17"
+
+[dev-dependencies]
+anyhow = "1.0.100"

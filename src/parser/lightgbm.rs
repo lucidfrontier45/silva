@@ -1,14 +1,32 @@
 use std::path::Path;
 
-use anyhow::Result as AnyResult;
 use itertools::izip;
+use std::result::Result;
+use thiserror::Error;
 
 use crate::{
     Forest, MultiOutputForest,
     tree::{Tree, TreeNode},
 };
 
-pub fn read_lightgbm_model(path: impl AsRef<Path>) -> AnyResult<MultiOutputForest> {
+/// Custom error types for LightGBM model parsing
+#[derive(Debug, Error)]
+pub enum LightGBMError {
+    #[error("IO error: {source}")]
+    Io {
+        #[from]
+        source: std::io::Error,
+    },
+    #[error("Parse int error: {source}")]
+    ParseInt {
+        #[from]
+        source: std::num::ParseIntError,
+    },
+    #[error("Parse error: {message}")]
+    Parse { message: String },
+}
+
+pub fn read_lightgbm_model(path: impl AsRef<Path>) -> Result<MultiOutputForest, LightGBMError> {
     let tree_records = read_lightgbm_txt(path)?;
     let trees = tree_records
         .into_iter()
@@ -87,7 +105,7 @@ impl From<LGBMTreeRecord> for Tree {
     }
 }
 
-fn read_lightgbm_txt(path: impl AsRef<Path>) -> AnyResult<Vec<Vec<LGBMTreeRecord>>> {
+fn read_lightgbm_txt(path: impl AsRef<Path>) -> Result<Vec<Vec<LGBMTreeRecord>>, LightGBMError> {
     let content = std::fs::read_to_string(path)?;
     let lines: Vec<&str> = content.lines().collect();
 
@@ -112,8 +130,9 @@ fn read_lightgbm_txt(path: impl AsRef<Path>) -> AnyResult<Vec<Vec<LGBMTreeRecord
         }
     }
 
-    let num_trees = num_tree_per_iteration
-        .ok_or_else(|| anyhow::anyhow!("num_tree_per_iteration not found in header"))?;
+    let num_trees = num_tree_per_iteration.ok_or_else(|| LightGBMError::Parse {
+        message: "num_tree_per_iteration not found in header".to_string(),
+    })?;
 
     let num_iterations = tree_records.len() / num_trees;
     let mut result: Vec<Vec<LGBMTreeRecord>> = vec![Vec::new(); num_trees];

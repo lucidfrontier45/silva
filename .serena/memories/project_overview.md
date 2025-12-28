@@ -16,7 +16,7 @@ Silva is a tiny inference engine for tree ensemble models (a.k.a forest models) 
 ## Tech Stack
 - **Language**: Rust (edition 2024)
 - **Core Dependencies**:
-  - `anyhow` - Error handling
+  - `thiserror` - Custom error types
   - `indexmap` - Deterministic iteration hash maps
   - `itertools` - Iterator utilities
   - `ordered-float` - NaN-safe floating point

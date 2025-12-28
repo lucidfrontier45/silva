@@ -1,6 +1,5 @@
 use std::{collections::HashMap, path::Path, vec};
 
-use anyhow::{Context, Result as AnyResult};
 use itertools::izip;
 use serde::{Deserialize, Serialize};
 use serdeio::read_record_from_file;
@@ -22,6 +21,11 @@ pub enum XGBoostError {
     InvalidBaseScore { value: String },
     #[error("Model parameter error: {parameter}")]
     InvalidParameters { parameter: String },
+    #[error("File read error: {source}")]
+    FileRead {
+        #[from]
+        source: serdeio::Error,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -247,9 +251,9 @@ pub fn parse_xgboost_model(record: XGBoostModelRecord) -> Result<MultiOutputFore
     Ok(MultiOutputForest::new(forests))
 }
 
-pub fn read_xgboost_model(path: impl AsRef<Path>) -> AnyResult<MultiOutputForest> {
-    let record = read_record_from_file(path).context("Failed to read XGBoost model file")?;
-    parse_xgboost_model(record).context("Failed to parse XGBoost model")
+pub fn read_xgboost_model(path: impl AsRef<Path>) -> Result<MultiOutputForest, XGBoostError> {
+    let record = read_record_from_file(path)?;
+    parse_xgboost_model(record)
 }
 
 fn parse_base_score(s: &str) -> Result<Vec<f64>, String> {
