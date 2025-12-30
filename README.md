@@ -56,3 +56,63 @@ Single node with:
 - `value`: Leaf value (NotNan<f64>)
 
 Leaves have no children; internal nodes contain split logic.
+
+# Silva Format Example
+
+```json
+{
+  "forests": [
+    {
+      "base_value": 0.5,
+      "trees": [
+        {
+          "nm": {
+            "0": {"id": 0, "si": 0, "sc": 2.5, "l": 1, "r": 2, "v": 0.0},
+            "1": {"id": 1, "si": 1, "sc": 1.5, "l": null, "r": null, "v": 3.0},
+            "2": {"id": 2, "si": 1, "sc": 3.5, "l": null, "r": null, "v": 5.0}
+          },
+          "root": 0
+        },
+        {
+          "nm": {
+            "0": {"id": 0, "si": 0, "sc": 5.0, "l": 1, "r": 2, "v": 0.0},
+            "1": {"id": 1, "si": 1, "sc": 2.0, "l": null, "r": null, "v": 10.0},
+            "2": {"id": 2, "si": 1, "sc": 3.0, "l": null, "r": null, "v": 20.0}
+          },
+          "root": 0
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Field Notation
+
+| Abbreviation | Full Name | Description |
+|--------------|-----------|-------------|
+| `nm` | node_map | Hash map mapping node ID to TreeNode |
+| `si` | split_index | Feature index used for splitting at this node |
+| `sc` | split_condition | Threshold value for the split comparison |
+| `l` | left | ID of left child node (null for leaves) |
+| `r` | right | ID of right child node (null for leaves) |
+| `v` | value | Leaf prediction value (only used in leaf nodes) |
+
+## Structure Hierarchy
+
+```
+MultiOutputForest
+└── forests: Forest[]
+    ├── base_value: f64 (baseline score)
+    ├── trees: Tree[]
+    │   ├── nm: {node_id: TreeNode}
+    │   │   ├── id: node ID
+    │   │   ├── si: feature index to split on
+    │   │   ├── sc: split threshold
+    │   │   ├── l: left child ID (or null)
+    │   │   ├── r: right child ID (or null)
+    │   │   └── v: leaf value
+    │   └── root: ID of the root node
+```
+
+**Prediction Flow**: Start at root → compare feature[si] with sc → follow l or r → repeat until leaf → sum all tree values → add base_value
