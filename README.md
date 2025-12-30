@@ -6,6 +6,14 @@
 
 Silva is a tiny inference engine for tree ensemble models (a.k.a forest models) in Rust.
 
+## Why Silva?
+
+Silva makes it easier for Rust programs to use pre-trained XGBoost and LightGBM models by providing a lightweight inference engine that avoids runtime dependencies on external machine learning libraries. Key benefits include:
+
+- **Pure Rust**: Entirely written in Rust for high performance, memory safety, and zero-cost abstractions
+- **Simple Codebase**: Minimal, clean implementation that's easy to understand, integrate, and maintain
+- **No External Dependencies**: Parses and runs models from XGBoost and LightGBM without requiring those libraries to be installed or linked
+
 # Supported Formats
 
 ## Silva Format
@@ -93,14 +101,14 @@ Leaves have no children; internal nodes contain split logic.
 
 ## Field Notation
 
-| Abbreviation | Full Name | Description |
-|--------------|-----------|-------------|
-| `nm` | node_map | Hash map mapping node ID to TreeNode |
-| `si` | split_index | Feature index used for splitting at this node |
-| `sc` | split_condition | Threshold value for the split comparison |
-| `l` | left | ID of left child node (null for leaves) |
-| `r` | right | ID of right child node (null for leaves) |
-| `v` | value | Leaf prediction value (only used in leaf nodes) |
+| Abbreviation | Full Name       | Description                                     |
+| ------------ | --------------- | ----------------------------------------------- |
+| `nm`         | node_map        | Hash map mapping node ID to TreeNode            |
+| `si`         | split_index     | Feature index used for splitting at this node   |
+| `sc`         | split_condition | Threshold value for the split comparison        |
+| `l`          | left            | ID of left child node (null for leaves)         |
+| `r`          | right           | ID of right child node (null for leaves)        |
+| `v`          | value           | Leaf prediction value (only used in leaf nodes) |
 
 ## Structure Hierarchy
 
