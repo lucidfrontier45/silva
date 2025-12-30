@@ -173,4 +173,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Understanding Predictions
+
+The `predict` methods return **raw values** that may require post-processing depending on the model type and objective:
+
+### Classification Models
+
+For binary classification using `binary:logistic`, apply sigmoid to the raw prediction:
+```rust
+let raw = forest.predict(&features);
+let probability = 1.0 / (1.0 + (-raw).exp()); // sigmoid
+```
+
+For multiclass classification using `multi:softmax` or `multi:softprob`, apply softmax to the predictions:
+```rust
+let raw_values = model.predict(&features);
+let exp_values: Vec<f64> = raw_values.iter().map(|&v| v.exp()).collect();
+let sum: f64 = exp_values.iter().sum();
+let probabilities: Vec<f64> = exp_values.iter().map(|&v| v / sum).collect();
+```
+
+### Regression Models
+
+For Poisson regression objectives, apply exponential to the raw prediction:
+```rust
+let raw = forest.predict(&features);
+let count_prediction = raw.exp();
+```
+
+For standard regression (e.g., `reg:squarederror`), the raw value can be used directly.
+
+### LightGBM Note
+
+LightGBM models incorporate bias into leaf values, so no separate `base_score` adjustment is needed for predictions.
+
 For more examples, see `examples/prediction.rs`.
