@@ -1,5 +1,9 @@
 <img src="logo.png" alt="logo" width="300">
 
+[![crates.io](https://img.shields.io/crates/v/silva)](https://crates.io/crates/silva)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Repository](https://img.shields.io/badge/github-lucidfrontier45/silva-blue)](https://github.com/lucidfrontier45/silva)
+
 Silba is a tiny inference engine for tree ensemble models (a.k.a forest models) in Rust.
 
 # Supported Formats
