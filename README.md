@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Repository](https://img.shields.io/badge/github-lucidfrontier45/silva-blue)](https://github.com/lucidfrontier45/silva)
 
-Silba is a tiny inference engine for tree ensemble models (a.k.a forest models) in Rust.
+Silva is a tiny inference engine for tree ensemble models (a.k.a forest models) in Rust.
 
 # Supported Formats
 
