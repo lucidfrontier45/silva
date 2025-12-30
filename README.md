@@ -116,3 +116,57 @@ MultiOutputForest
 ```
 
 **Prediction Flow**: Start at root → compare feature[si] with sc → follow l or r → repeat until leaf → sum all tree values → add base_value
+
+# Usage Examples
+
+## Basic Prediction
+
+The predict methods work with feature vectors (`&[f64]`) and return prediction values.
+
+### Single Tree Prediction
+```rust
+use silva::Tree;
+
+let tree = Tree::new(node_map, root_id);
+let prediction = tree.predict(&[1.5, 2.3, 0.8]); // returns NotNan<f64>
+```
+
+### Forest (Single Output)
+```rust
+use silva::Forest;
+
+let forest = Forest::new(base_value, trees);
+let prediction = forest.predict(&[1.5, 2.3, 0.8]); // returns NotNan<f64>
+```
+
+### Multi-Output Forest
+```rust
+use silva::MultiOutputForest;
+
+let model = MultiOutputForest::new(forests);
+let predictions = model.predict(&[1.5, 2.3, 0.8]); // returns Vec<NotNan<f64>>
+```
+
+## Complete Workflow Example
+
+```rust
+use silva::MultiOutputForest;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load model from file
+    let model = MultiOutputForest::from_file("model.json")?;
+    
+    // Prepare feature data
+    let features = vec![vec![1.5, 2.3, 0.8], vec![0.5, 1.2, 3.4]];
+    
+    // Make predictions
+    for x in &features {
+        let prediction = model.predict(x);
+        println!("Predictions: {:?}", prediction);
+    }
+    
+    Ok(())
+}
+```
+
+For more examples, see `examples/prediction.rs`.
