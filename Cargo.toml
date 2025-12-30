@@ -5,6 +5,7 @@ edition = "2024"
 authors = ["杜 世橋 Du Shiqiao <lucidfrontier.45@gmail.com>"]
 repository = "https://github.com/lucidfrontier45/silva"
 license = "MIT"
+description = "A fast Rust inference engine for tree ensemble models supporting XGBoost, LightGBM, and native formats"
 categories = ["science"]
 
 [dependencies]
