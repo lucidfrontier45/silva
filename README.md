@@ -1,4 +1,4 @@
-# Silva
+<img src="logo.png" alt="logo" width="300">
 
 Silba is a tiny inference engine for tree ensemble models (a.k.a forest models) in Rust.
 
