@@ -57,8 +57,9 @@ Prediction formula: `base_value + Σ tree_predictions`
 Individual decision tree represented as:
 - `node_map`: Hash map of node ID → `TreeNode`
 - `root`: Root node ID
+- `split_comparison`: Comparison operator at split nodes (`Less` or `LessOrEqual`). Set by the parser — XGBoost trees use `Less`, LightGBM and scikit-learn trees use `LessOrEqual`. Defaults to `Less` for backward compatibility.
 
-Traverses tree from root to leaf based on feature comparisons.
+Traverses tree from root to leaf based on feature comparisons. The comparison operator is per-tree (not per-node) because all splits in a tree from a given source framework use the same convention.
 
 ## TreeNode
 Single node with:
@@ -91,7 +92,8 @@ Leaves have no children; internal nodes contain split logic.
             "1": {"id": 1, "si": 1, "sc": 2.0, "l": null, "r": null, "v": 10.0},
             "2": {"id": 2, "si": 1, "sc": 3.0, "l": null, "r": null, "v": 20.0}
           },
-          "root": 0
+          "root": 0,
+          "cmp": "less_or_equal"
         }
       ]
     }
@@ -107,8 +109,9 @@ Leaves have no children; internal nodes contain split logic.
 | `si`         | split_index     | Feature index used for splitting at this node   |
 | `sc`         | split_condition | Threshold value for the split comparison        |
 | `l`          | left            | ID of left child node (null for leaves)         |
-| `r`          | right           | ID of right child node (null for leaves)        |
-| `v`          | value           | Leaf prediction value (only used in leaf nodes) |
+| `r`          | right           | ID of right child node (null for leaves)         |
+| `v`          | value           | Leaf prediction value (only used in leaf nodes)  |
+| `cmp`        | split_comparison| Comparison operator (`less` / `less_or_equal`); omitted = `less` (XGBoost convention) |
 
 ## Structure Hierarchy
 

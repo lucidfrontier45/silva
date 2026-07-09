@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::{
     Forest, MultiOutputForest,
-    tree::{Tree, TreeNode},
+    tree::{SplitComparison, Tree, TreeNode},
 };
 
 /// Custom error types for LightGBM model parsing
@@ -101,7 +101,10 @@ impl From<LGBMTreeRecord> for Tree {
             nodes.push(leaf_node);
         }
 
-        Tree::from_nodes(nodes)
+        // LightGBM trees use `x <= threshold` to route to the left child (same as scikit-learn).
+        // This differs from XGBoost, which uses `x < threshold`. Without this flag, exact-threshold
+        // equality would route to the wrong leaf (see issue #7).
+        Tree::from_nodes_with_comparison(nodes, SplitComparison::LessOrEqual)
     }
 }
 
@@ -224,7 +227,10 @@ fn parse_tree_section(lines: &[&str], start_idx: usize) -> Option<LGBMTreeRecord
 mod tests {
     use std::path::PathBuf;
 
-    use crate::parser::{read_lightgbm_model, test_utils::test_model_prediction};
+    use crate::{
+        Tree,
+        parser::{read_lightgbm_model, test_utils::test_model_prediction},
+    };
 
     fn test_lightgbm(model_type: &str) {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
@@ -250,5 +256,29 @@ mod tests {
     #[test]
     fn test_multiclass_classification() {
         test_lightgbm("multiclass_classification");
+    }
+
+    #[test]
+    fn test_lgbm_parser_routes_exact_threshold_to_left() {
+        // Locks in the fix for issue #7: a LightGBM tree must route a feature value that is
+        // exactly equal to the split threshold to the LEFT child, not the right. The default
+        // XGBoost-style `<` would route equality to the right and silently mis-predict.
+        // Build a minimal 3-node LightGBM record: one split, two leaves.
+        let record = super::LGBMTreeRecord {
+            split_features: vec![0],
+            thresholds: vec![5.0],
+            // In LightGBM's scheme, a negative child index `-k` (1-based) refers to leaf `k - 1`.
+            // Index `-1` => leaf 0 (value 10, "left"); `-2` => leaf 1 (value 20, "right").
+            left_children: vec![-1],
+            right_children: vec![-2],
+            leaf_values: vec![10.0, 20.0],
+        };
+        let tree: Tree = record.into();
+
+        // Exact threshold: LightGBM semantics route LEFT (value 10).
+        assert_eq!(tree.predict(&[5.0]).into_inner(), 10.0);
+        // Strictly below and strictly above still behave as expected.
+        assert_eq!(tree.predict(&[4.99]).into_inner(), 10.0);
+        assert_eq!(tree.predict(&[5.01]).into_inner(), 20.0);
     }
 }

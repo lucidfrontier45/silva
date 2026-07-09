@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serdeio::read_record_from_file;
 use thiserror::Error;
 
-use crate::{Forest, MultiOutputForest, Tree, TreeNode};
+use crate::{Forest, MultiOutputForest, Tree, TreeNode, tree::SplitComparison};
 
 /// Custom error types for XGBoost model parsing
 #[derive(Debug, Error)]
@@ -128,7 +128,9 @@ impl TreeRecord {
             nodes.push(node);
         }
 
-        Tree::from_nodes(nodes)
+        // XGBoost trees use `x < threshold` to route to the left child. We pass the operator
+        // explicitly (instead of relying on the default) for symmetry with the LightGBM parser and to make the framework-specific semantics visible at the call site.
+        Tree::from_nodes_with_comparison(nodes, SplitComparison::Less)
     }
 }
 
